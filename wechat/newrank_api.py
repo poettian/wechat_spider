@@ -22,72 +22,25 @@ class NewRankApi(object):
         'x-requested-with': 'XMLHttpRequest'
     }
 
-    # 访问接口失败后重试次数和计数器
-    __fail_trys = 1
-    __fail_counter = 0
-
     def __init__(self):
-
-        # 读取用户信息
         self.__data_file = os.path.join('.', 'wechat', 'data.json')
-        if os.path.exists(self.__data_file):
+        if not os.path.exists(self.__data_file):
+            newrank_user = self._login()
+        else:
             with open(self.__data_file, 'r') as f:
                 data = f.read()
                 newrank_user = json.loads(data) if data else None
-        else:
-            newrank_user = self._login()
-        
-        self._build_cookies(newrank_user)
-
-    def download(self, account, uuid):
-        '''
-        下载数据接口
-
-        account - 公众号的微信号
-        '''
-
-        # 构造请求参数
-        request_uri = '/xdnphb/detail/getAccountArticle'
-        headers = {
-            'referer': self._get_url('/public/info/detail.html?account=' + account),
-            **self.__headers
-        }
-
-        data = {
-            'flag': True,
-            'uuid': uuid,
-        }
-        self._rebuild_data(request_uri, data)
-
-        # 发起请求
-        resp = requests.post(self._get_url(request_uri), headers=headers, data=data, cookies=self.__cookies, timeout=30)
-        resp_data = resp.json()
-
-        if resp.status_code != 200 or resp_data.get('success') != True:
-            raise Exception('公众号[' + account + '] download failed: ' + json.dumps(resp_data))
-
-        if not isinstance(resp_data.get('value'), dict):
-            # 如果无数据，第一次视为 cookie 失效，发起重试
-            if self.__fail_counter < 1:
-                self.__fail_counter += 1
-                newrank_user = self._login()
                 self._build_cookies(newrank_user)
-                return self.download(account, uuid)
-            else:
-                raise Exception('公众号[ ' + account + '] download failed after retry')
-
-        # 提取文章列表
-        articles = resp_data.get('value').get('lastestArticle')
-        if not isinstance(articles, list) or len(articles) == 0:
-            return
-
-        return articles
+            # 测试用户登录态是否失效
+            if not self._check_online():
+                newrank_user = self._login()
+        self._build_cookies(newrank_user)
 
     def _build_cookies(self, newrank_user):
         '''构造请求 cookie'''
 
         if not newrank_user:
-            raise Exception('empty newrank_user info when build cookies')
+            raise Exception('构造cookie时，传递了空的用户信息')
 
         self.__cookies = {
             'rmbuser': 'true',
@@ -121,6 +74,36 @@ class NewRankApi(object):
             l.append(k + '=' + v)
         data['xyz'] = md5((request_uri + '?AppKey=joker&' + '&'.join(l)).encode('utf-8')).hexdigest()
     
+    def _check_online(self, tries=1):
+        '''判断用户是否处于登录态'''
+
+        # 构造请求参数
+        request_uri = '/xdnphb/common/account/get'
+        headers = {
+            'referer': self._get_url('/'),
+            **self.__headers
+        }
+        data = {}
+        self._rebuild_data(request_uri, data)
+
+        # 发起请求
+        resp = requests.post(self._get_url(request_uri), headers=headers, data=data, cookies=self.__cookies, timeout=30)
+        try:
+            error_str = '校验用户信息接口响应错误: ' + str(resp.status_code) + ' ' + resp.text
+            if resp.status_code != 200:
+                raise Exception(error_str)
+            resp_data = resp.json()
+            if resp_data.get('success') != True:
+                raise Exception(error_str)
+        except Exception:
+            if tries >= 3:
+                raise Exception('校验用户信息失败')
+            else:
+                tries += 1
+                return self._check_online(tries)
+
+        return isinstance(resp_data.get('value'), dict)
+
     def _login(self):
         '''
         登录接口
@@ -147,20 +130,25 @@ class NewRankApi(object):
 
         # 发起请求
         resp = requests.post(self._get_url(request_uri), headers=headers, data=data, timeout=30)
-        resp_data = resp.json()
-        if resp.status_code != 200 or resp_data.get('success') != True:
-            raise Exception('login failed: ' + json.dumps(resp_data))
-        newrank_user = resp_data.get('value')
+        error_str = '登录接口响应错误: ' + str(resp.status_code) + ' ' + resp.text
+        if resp.status_code != 200:
+            raise Exception(error_str)
+        try:
+            resp_data = resp.json()
+        except Exception:
+            raise Exception(error_str)
+        if resp_data.get('success') != True:
+            raise Exception(error_str)
 
-        # 用户信息写入 self.__data_file        
+        newrank_user = resp_data.get('value')  
         with open(self.__data_file, 'w') as f:
             f.write(json.dumps(newrank_user))
-        
+
         logger.info('登录并获取用户信息，写入数据文件')
 
         return newrank_user
     
-    def query(self, account):
+    def query(self, account, tries=1):
         '''
         获取新榜分配给公众号的 uuid，提供给 download 接口使用
 
@@ -183,20 +171,22 @@ class NewRankApi(object):
 
         # 发起请求
         resp = requests.post(self._get_url(request_uri), headers=headers, data=data, cookies=self.__cookies, timeout=30)
-        resp_data = resp.json()
-
-        if resp.status_code != 200 or resp_data.get('success') != True:
-            raise Exception('公众号[' + account + '] query failed: ' + json.dumps(resp_data))
+        error_str = '公众号[' + account + ']查询uuid接口响应错误: ' + str(resp.status_code) + ' ' + resp.text
+        try:
+            if resp.status_code != 200:
+                raise Exception(error_str)
+            resp_data = resp.json()
+            if resp_data.get('success') != True:
+                raise Exception(error_str)
+        except Exception:
+            if tries >= 3:
+                raise Exception('公众号[' + account + ']查询uuid失败')
+            else:
+                tries += 1
+                return self.query(account, tries)
 
         if not isinstance(resp_data.get('value'), dict):
-            # 如果无数据，第一次视为 cookie 失效，发起重试
-            if self.__fail_counter < 1:
-                self.__fail_counter += 1
-                newrank_user = self._login()
-                self._build_cookies(newrank_user)
-                return self.query(account)
-            else:
-                raise Exception('公众号[ ' + account + '] query failed after retry')
+            raise Exception(error_str)
         
         # 提取 uuid    
         uuid = None
@@ -208,3 +198,49 @@ class NewRankApi(object):
                     break
 
         return uuid
+
+    def download(self, account, uuid, tries=1):
+        '''
+        下载数据接口
+
+        account - 公众号的微信号
+        '''
+
+        # 构造请求参数
+        request_uri = '/xdnphb/detail/getAccountArticle'
+        headers = {
+            'referer': self._get_url('/public/info/detail.html?account=' + account),
+            **self.__headers
+        }
+
+        data = {
+            'flag': True,
+            'uuid': uuid,
+        }
+        self._rebuild_data(request_uri, data)
+
+        # 发起请求，处理响应
+        resp = requests.post(self._get_url(request_uri), headers=headers, data=data, cookies=self.__cookies, timeout=30)
+        error_str = '公众号[' + account + ']抓取文章接口响应错误: ' + str(resp.status_code) + ' ' + resp.text
+        try:
+            if resp.status_code != 200:
+                raise Exception(error_str)
+            resp_data = resp.json()
+            if resp_data.get('success') != True:
+                raise Exception(error_str)
+        except Exception:
+            if tries >= 3:
+                raise Exception('公众号[' + account + ']抓取文章失败')
+            else:
+                tries += 1
+                return self.download(account, uuid, tries)
+
+        if not isinstance(resp_data.get('value'), dict):
+            raise Exception(error_str)
+
+        # 提取文章列表
+        articles = resp_data.get('value').get('lastestArticle')
+        if not isinstance(articles, list) or len(articles) == 0:
+            return
+
+        return articles

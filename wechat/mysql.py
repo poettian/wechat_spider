@@ -12,12 +12,14 @@ class Mysql(object):
         'accounts': {
             'account_name': '',
             'account_no': '',
+            'head_image': '',
             'newrank_uuid': '',
-            'extra_info': '',
             'fetch_time': None,
+            'public_time': None,
             'is_disabled': 0
         },
         'articles': {
+            'account_id': 0,
             'title': '',
             'summary': '',
             'url': '',
