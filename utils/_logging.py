@@ -2,10 +2,11 @@
 
 import os
 import logging
+from datetime import datetime
 
 os.environ['DEBUG'] = '1'
 
-LOG_PATH = './wechat_spider.log'
+LOG_PATH = './wechat_spider_' + datetime.now().strftime('%Y%m%d') + '.log'
 LOG_FORMAT = '\t'.join([
     'log_time=%(asctime)s',
     'levelname=%(levelname)s',
