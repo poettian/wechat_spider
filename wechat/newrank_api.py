@@ -243,4 +243,6 @@ class NewRankApi(object):
         if not isinstance(articles, list) or len(articles) == 0:
             return
 
+        articles.reverse()
+
         return articles
