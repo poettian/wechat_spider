@@ -6,13 +6,17 @@ import traceback
 import re
 import os
 
-from wechat.newrank_api import NewRankApi
-from wechat.mysql import Mysql
-from utils._logging import logger
+from .newrank_api import NewRankApi
+from .mysql import Mysql
+from ..utils._logging import logger
 
 def get_all_account_articles():
     api = NewRankApi()
-    db = Mysql()
+    try:
+        db = Mysql()
+    except Exception as e:
+        print('连接数据库失败：' + str(e))
+        os._exit(0)
     try:
         accounts = db.query('select id,account_name,account_no,newrank_uuid,fetch_time from accounts where is_disabled=%s', (0,))
         if not accounts:

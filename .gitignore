@@ -5,3 +5,7 @@ __pycache__
 dist
 build
 tests
+log
+
+# Files
+data.json

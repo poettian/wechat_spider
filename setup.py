@@ -8,7 +8,6 @@ def read(fname):
     with open(os.path.join(os.path.dirname(__file__), fname)) as f:
         return f.read()
 
-
 setup(
     name = 'wechat_spider',
     version = '0.1.0',
@@ -35,7 +34,7 @@ setup(
     ],
     entry_points = {
         'console_scripts': [
-            'hzcs_get_articles = wechat:get_all_account_articles',
+            'hzcs_articles = wechat_spider:hzcs_articles',
         ]
     }
 )

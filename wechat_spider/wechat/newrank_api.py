@@ -8,7 +8,7 @@ from hashlib import md5
 import json
 
 from .config import conf_newrank
-from utils._logging import logger
+from ..utils._logging import logger
 
 class NewRankApi(object):
 
@@ -23,7 +23,7 @@ class NewRankApi(object):
     }
 
     def __init__(self):
-        self.__data_file = os.path.join('.', 'wechat', 'data.json')
+        self.__data_file = os.path.join('.', 'data.json')
         if not os.path.exists(self.__data_file):
             newrank_user = self._login()
         else:

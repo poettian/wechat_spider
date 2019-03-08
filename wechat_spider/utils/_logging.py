@@ -6,7 +6,13 @@ from datetime import datetime
 
 os.environ['DEBUG'] = '1'
 
-LOG_PATH = './log/wechat_spider_' + datetime.now().strftime('%Y%m%d') + '.log'
+log_dir = './log'
+
+if not os.path.isdir(log_dir):
+    os.makedirs(log_dir)
+
+LOG_PATH = os.path.join(log_dir, datetime.now().strftime('%Y%m%d.log'))
+
 LOG_FORMAT = '\t'.join([
     'log_time=%(asctime)s',
     'levelname=%(levelname)s',

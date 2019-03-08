@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from wechat import get_all_account_articles
+from wechat_spider import hzcs_articles
 
 if __name__ == '__main__':
-    get_all_account_articles()
+    hzcs_articles()
