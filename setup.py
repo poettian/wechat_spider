@@ -30,7 +30,8 @@ setup(
     keywords = 'wechat articles newrank',
     packages = find_packages(exclude=["*.tests", "*.tests.*", "tests.*", "tests"]),
     install_requires = [
-        'requests'
+        'requests',
+        'PyMySQL'
     ],
     entry_points = {
         'console_scripts': [
