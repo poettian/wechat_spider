@@ -7,7 +7,7 @@ from random import random, choice
 from hashlib import md5
 import json
 
-from .config import conf_newrank
+from ..config import conf_newrank
 from ..utils._logging import logger
 
 class NewRankApi(object):

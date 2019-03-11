@@ -3,7 +3,7 @@
 import os
 import pymysql.cursors
 
-from .config import conf_db
+from ..config import conf_db
 
 class Mysql(object):
 

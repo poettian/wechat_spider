@@ -1,7 +1,9 @@
 # coding=utf8
-from functools import wraps
-from ._logging import logger
 
+from functools import wraps
+
+from .mail import MailServer
+from ._logging import logger
 
 class Singleton(type):
     _instances = {}

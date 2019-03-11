@@ -3,8 +3,9 @@
 import os
 import logging
 from datetime import datetime
+from ..config import conf_log
 
-os.environ['DEBUG'] = '1'
+os.environ['DEBUG'] = '1' if conf_log['debug'] else '0'
 
 log_dir = './log'
 
@@ -20,7 +21,7 @@ LOG_FORMAT = '\t'.join([
     '%(message)s',
     'location=%(pathname)s:%(lineno)d\n'])
 
-level = logging.DEBUG if os.getenv('DEBUG') == '1' else logging.INFO
+level = logging.DEBUG if os.getenv('DEBUG') else logging.INFO
 
 file_handler = logging.FileHandler(filename=LOG_PATH)
 file_handler.setLevel(level)

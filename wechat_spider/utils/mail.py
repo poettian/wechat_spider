@@ -1,40 +1,32 @@
 # coding=utf8
 
+from ..config import conf_mail
 from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.utils import formatdate
+from email.utils import formatdate, parseaddr, formataddr
+from email.header import Header
 import smtplib
-
 
 class MailServer(object):
     """Represents an SMTP server, able to send outgoing emails, with SSL and TLS capabilities."""
 
-    def __init__(self, host, port, user, password, encryption, timeout=60):
-        self._smtp_host = host
-        self._smtp_port = port
-        self._smtp_user = user
-        self._smtp_pass = password
-        self._smtp_encryption = encryption
+    def __init__(self, timeout=60):
+        self._smtp_host = conf_mail['host']
+        self._smtp_port = conf_mail['port']
+        self._smtp_user = conf_mail['user']
+        self._smtp_pass = conf_mail['password']
+        self._smtp_encryption = conf_mail['encryption']
+        self._smtp_from_addr = conf_mail['from_addr']
+        self._smtp_from_name = conf_mail['from_name']
         self._smtp_timeout = timeout
 
-    def test_smtp_connection(self):
-        smtp = False
-        try:
-            smtp = self.connect()
-        except Exception as e:
-            raise Exception("Connection Test Failed! Here is what we got instead:\n %s" % e)
-        finally:
-            try:
-                if smtp:
-                    smtp.quit()
-            except Exception:
-                # ignored, just a consequence of the previous exception
-                pass
-        print("Connection Test Succeeded! Everything seems properly set up!")
+    def _format_addr(self, s):
+        name, addr = parseaddr(s)
+        return formataddr((Header(name, 'utf-8').encode(), addr))
 
-    def connect(self):
+    def _connect(self):
         """Returns a new SMTP connection to the given SMTP server."""
 
         smtp_server = self._smtp_host
@@ -53,7 +45,7 @@ class MailServer(object):
         connection.login(smtp_user, smtp_password)
         return connection
 
-    def build_email(self, email_to, subject, body, attachments=None, subtype='plain'):
+    def _build_email(self, email_to, subject, body, attachments=None, subtype='plain'):
         """Constructs an RFC2822 email.message.Message object based on the keyword arguments passed, and returns it.
 
            :param list email_to: list of recipient addresses (to be joined with commas)
@@ -72,7 +64,8 @@ class MailServer(object):
         """
 
         msg = MIMEMultipart()
-        msg['Subject'] = subject
+        msg['From'] = self._format_addr('%s <%s>' % (self._smtp_from_name, self._smtp_from_addr))
+        msg['Subject'] = Header(subject, 'utf-8').encode() 
         msg['To'] = email_to
         msg['Date'] = formatdate()
 
@@ -89,18 +82,28 @@ class MailServer(object):
                 msg.attach(part)
         return msg
 
-    def send_email(self, message):
+    def _send_email(self, message):
         """Sends an email"""
 
         try:
-            smtp = self.connect()
+            smtp = self._connect()
             try:
-                smtp.sendmail(self._smtp_user, message['To'], message.as_string())
+                smtp.sendmail(self._smtp_from_addr, message['To'], message.as_string())
             finally:
                 smtp.quit()
         except Exception as e:
+            raise Exception("邮件发送失败:%s" % e)
 
-            raise Exception("Mail Delivery Failed:%s" % e)
+    def send(self, to, subject, content, attachments=None, subtype='plain'):
+        '''
+        发送邮件
+        to: '收件人地址',
+        subject: '邮件主题',
+        content: '邮件内容',
+        attachments: (附件名，附件内容字节流),
+        subtype: 'MIME格式'
+        '''
+        
+        msg = self._build_email(to, subject, content, attachments, subtype)
 
-
-
+        self._send_email(msg)

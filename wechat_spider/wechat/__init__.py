@@ -11,17 +11,28 @@ from .mysql import Mysql
 from ..utils._logging import logger
 
 def get_all_account_articles():
-    api = NewRankApi()
+    '''通过接口抓取公众号文章并存入数据库'''
+
+    errors = []
+
     try:
         db = Mysql()
     except Exception as e:
-        print('连接数据库失败：' + str(e))
-        os._exit(0)
+        error_str = '连接数据库失败：%s' % e
+        logger.error(error_str)
+        errors.append(error_str)
+        return errors
+
+    api = NewRankApi()
+
     try:
         accounts = db.query('select id,account_name,account_no,newrank_uuid,fetch_time from accounts where is_disabled=%s', (0,))
         if not accounts:
-            logger.warn('未查询到待抓取的公众号信息')
-            return
+            error_str = '未查询到待抓取的公众号信息'
+            logger.warn(error_str)
+            errors.append(error_str)
+            return errors
+
         zero = datetime.strptime(datetime.now().strftime('%Y-%m-%d') + ' 00:00:00', '%Y-%m-%d %H:%M:%S')
         for account in accounts:
             account_id = account.get('id')
@@ -31,7 +42,7 @@ def get_all_account_articles():
             # 判断抓取时间
             last_fetch_time = account.get('fetch_time')
             if not last_fetch_time is None and last_fetch_time > zero:
-                logger.info('公众号 [' + account_name + '] 当日已抓取')
+                logger.info('公众号 [%s] 当日已抓取' % account_name)
                 continue
 
             # 取 uuid
@@ -40,21 +51,29 @@ def get_all_account_articles():
                 if not uuid:
                     uuid = api.query(account_no)
                     if not uuid:
-                        logger.warn('未通过接口查询到公众号 [' + account_name + '] 的 uuid')
+                        error_str = '未通过接口查询到公众号 [%s] 的 uuid' % account_name
+                        logger.warn(error_str)
+                        errors.append(error_str)
                         continue
                     db.update('update accounts set newrank_uuid=%s where id=%s', (uuid, account_id))
             except Exception as e:
-                logger.warn(str(e))
+                error_str = str(e)
+                logger.warn(error_str)
+                errors.append(error_str)
                 continue
 
             # 抓取文章数据
             try:
                 articles = api.download(account_no, uuid)
                 if not articles:
-                    logger.warn('未通过接口查询到公众号 [' + account_name + '] 的历史文章数据')
+                    error_str = '未通过接口查询到公众号 [%s] 的历史文章数据' % account_name
+                    logger.warn(error_str)
+                    errors.append(error_str)
                     continue
             except Exception as e:
-                logger.warn(str(e))
+                error_str = str(e)
+                logger.warn(error_str)
+                errors.append(error_str)
                 continue
 
             # 文章数据入库
@@ -82,7 +101,9 @@ def get_all_account_articles():
                         last_public_time = public_time
             except Exception as e:
                 db.rollback()
-                logger.warn(str(e))
+                error_str = str(e)
+                logger.warn(error_str)
+                errors.append(error_str)
             else:
                 db.commit()
 
@@ -95,6 +116,10 @@ def get_all_account_articles():
             time.sleep(1)
     except Exception as e:
         tb = traceback.format_exc()
-        logger.error(str(e) + 'exception=%s' % tb)
+        error_str = '%s exception=%s' % (e, tb)
+        logger.error(error_str)
+        errors.append(error_str)
     finally:
         db.close()
+
+    return errors
